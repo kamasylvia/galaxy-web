@@ -14,11 +14,11 @@ import { mcpClient } from "../mcp/mcpClient";
 import { mcpToolRegistry } from "../mcp/mcpToolRegistry";
 
 const AGENT_API_PATHS = {
-  agentsJson: "/agents.json",
-  health: "/health",
-  query: "/v1/query",
-  terminate: "/v1/terminate",
-  sessions: "/v1/sessions",
+  agentsJson: "/api/agents.json",
+  health: "/api/v1/health",
+  query: "/api/v1/query",
+  terminate: "/api/v1/terminate",
+  sessions: "/api/v1/sessions",
 };
 
 function getAuthHeaders(connection: AgentConnection): HeadersInit {

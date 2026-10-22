@@ -72,11 +72,14 @@ async function fetchWidgetData(
       ? connectionUrl.slice(0, -1)
       : connectionUrl;
     
-    // Ensure endpoint starts with /
-    const normalizedEndpoint = endpoint.startsWith('/')
+    // Ensure endpoint starts with /; backend serves everything under /api.
+    let normalizedEndpoint = endpoint.startsWith('/')
       ? endpoint
       : `/${endpoint}`;
-    
+    if (!normalizedEndpoint.startsWith("/api/")) {
+      normalizedEndpoint = `/api${normalizedEndpoint}`;
+    }
+
     url = `${normalizedBaseUrl}${normalizedEndpoint}`;
   }
   

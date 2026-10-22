@@ -114,21 +114,21 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function getDashboards(): Promise<Dashboard[]> {
-  const response = await fetch(buildUrl("/v1/dashboard"), {
+  const response = await fetch(buildUrl("/api/v1/dashboard"), {
     headers: getAuthHeaders(resolveBaseUrl()),
   });
   return handleResponse<Dashboard[]>(response);
 }
 
 export async function getDashboard(id: string): Promise<Dashboard> {
-  const response = await fetch(buildUrl(`/v1/dashboard/${id}`), {
+  const response = await fetch(buildUrl(`/api/v1/dashboard/${id}`), {
     headers: getAuthHeaders(resolveBaseUrl()),
   });
   return handleResponse<Dashboard>(response);
 }
 
 export async function createDashboard(data: DashboardCreate): Promise<Dashboard> {
-  const response = await fetch(buildUrl("/v1/dashboard"), {
+  const response = await fetch(buildUrl("/api/v1/dashboard"), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders(resolveBaseUrl()) },
     body: JSON.stringify(data),
@@ -140,7 +140,7 @@ export async function updateDashboard(
   id: string,
   data: DashboardUpdate,
 ): Promise<Dashboard> {
-  const response = await fetch(buildUrl(`/v1/dashboard/${id}`), {
+  const response = await fetch(buildUrl(`/api/v1/dashboard/${id}`), {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...getAuthHeaders(resolveBaseUrl()) },
     body: JSON.stringify(data),
@@ -149,7 +149,7 @@ export async function updateDashboard(
 }
 
 export async function deleteDashboard(id: string): Promise<void> {
-  const response = await fetch(buildUrl(`/v1/dashboard/${id}`), {
+  const response = await fetch(buildUrl(`/api/v1/dashboard/${id}`), {
     method: "DELETE",
     headers: getAuthHeaders(resolveBaseUrl()),
   });
@@ -160,7 +160,7 @@ export async function addWidget(
   dashboardId: string,
   widget: Widget,
 ): Promise<Widget> {
-  const response = await fetch(buildUrl(`/v1/dashboard/${dashboardId}/widgets`), {
+  const response = await fetch(buildUrl(`/api/v1/dashboard/${dashboardId}/widgets`), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...getAuthHeaders(resolveBaseUrl()) },
     body: JSON.stringify(widget),
@@ -174,7 +174,7 @@ export async function updateWidget(
   data: Partial<Widget>,
 ): Promise<Widget> {
   const response = await fetch(
-    buildUrl(`/v1/dashboard/${dashboardId}/widgets/${encodeURIComponent(widgetId)}`),
+    buildUrl(`/api/v1/dashboard/${dashboardId}/widgets/${encodeURIComponent(widgetId)}`),
     {
       method: "PUT",
       headers: { "Content-Type": "application/json", ...getAuthHeaders(resolveBaseUrl()) },
@@ -189,7 +189,7 @@ export async function deleteWidget(
   widgetId: string,
 ): Promise<void> {
   const response = await fetch(
-    buildUrl(`/v1/dashboard/${dashboardId}/widgets/${encodeURIComponent(widgetId)}`),
+    buildUrl(`/api/v1/dashboard/${dashboardId}/widgets/${encodeURIComponent(widgetId)}`),
     { method: "DELETE", headers: getAuthHeaders(resolveBaseUrl()) },
   );
   return handleResponse<void>(response);

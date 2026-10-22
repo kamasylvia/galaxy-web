@@ -64,8 +64,8 @@ function apiWidgetToWidget(api: ApiWidget): Widget {
     position: {
       x: pos?.x ?? 0,
       y: pos?.y ?? 0,
-      w: pos?.w ?? 2,
-      h: pos?.h ?? 2,
+      w: pos?.w ?? 40,
+      h: pos?.h ?? 12,
     },
     data: api.data,
   };
@@ -548,6 +548,17 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
     }
   }, [widgets, groupConfigs, widgetDefinitions, customWidgets, activeId]);
 
+  const availableMarkets = [...new Set(
+    [...widgetDefinitions, ...customWidgets]
+      .map((d) => marketOf(d.id))
+      .filter(Boolean),
+  )];
+
+  const handleMarketsChange = (markets: string[]) => {
+    setAllowedMarkets(markets);
+    updateDashboard(activeId, { markets }).catch(() => {});
+  };
+
   async function saveLayout() {
     if (!activeId || widgets.length === 0) return;
     try {
@@ -578,11 +589,14 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
           ? connectionUrl.slice(0, -1)
           : connectionUrl;
         
-        // Ensure endpoint starts with /
-        const normalizedEndpoint = widgetDef.endpoint.startsWith('/')
+        // Ensure endpoint starts with /; backend serves everything under /api.
+        let normalizedEndpoint = widgetDef.endpoint.startsWith('/')
           ? widgetDef.endpoint
           : `/${widgetDef.endpoint}`;
-        
+        if (!normalizedEndpoint.startsWith("/api/")) {
+          normalizedEndpoint = `/api${normalizedEndpoint}`;
+        }
+
         url = `${normalizedBaseUrl}${normalizedEndpoint}`;
       }
 
@@ -1765,6 +1779,9 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
         })}
         loading={!widgetDefinitions.length && !customWidgets.length}
         currentTabName={addWidgetTabName}
+        allowedMarkets={allowedMarkets}
+        availableMarkets={availableMarkets}
+        onMarketsChange={handleMarketsChange}
       />
       {openTableSettingsWidgetId && (() => {
         const widget = widgets.find(w => w.id === openTableSettingsWidgetId);
