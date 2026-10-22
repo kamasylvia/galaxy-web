@@ -10,7 +10,7 @@
 - 添加菜单（Add Widgets）**只列**白名单内的 widget（内置 Chart/Table/… 永远可加，无市场归属的 `/udf` 也可加）。
 - 非白名单件点添加直接拦截（弹字，不发 POST）。
 - 空盘：加的第一个市场件自动定白名单并持久化。
-- 改白名单：`PUT /v1/dashboard/{id}` body `{"markets":["cn","hk"]}`（或删空即不限）。
+- 改白名单：`PUT /api/v1/dashboard/{id}` body `{"markets":["cn"]}`（或删空即不限）。
 
 ## 添加小组件
 
@@ -32,6 +32,6 @@
 
 ## 已知行为
 
-- `hk/*` 在 amazingdata 无覆盖，显示 Loading 为预期（非 bug）。
-- `cn/news` 对 A股回空数组，显示灰色 `No data available`（本地无新闻表，非 bug）。
-- 后端路由 `PUT /v1/dashboard/{id}/widgets/{widget_id}` 的 id 含 `/` 时可用（`:path` 转换器）；前端传裸 id 即可。
+- 无覆盖的市场显示 Loading 为预期行为，不是 bug。
+- 无新闻表的市场回空数组，显示灰色 `No data available`（非 bug）。
+- 后端路由 `PUT /api/v1/dashboard/{id}/widgets/{widget_id}` 的 id 含 `/` 时可用（`:path` 转换器）；前端传裸 id 即可。
