@@ -66,12 +66,12 @@ export default defineConfig(({ mode }) => {
     allowedHosts: getApiHostnames(),
     proxy: {
       "/api": {
-        target: "http://localhost:5182",
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
         changeOrigin: true,
         secure: false,
       },
       "/v1": {
-        target: "http://localhost:8001",
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
         changeOrigin: true,
         secure: false,
       },
@@ -81,9 +81,44 @@ export default defineConfig(({ mode }) => {
         secure: false,
       },
       "/ws": {
-        target: "ws://localhost:8001",
+        target: (env.VITE_BACKEND_URL || "http://lenovo:8000").replace(/^http/, "ws"),
         ws: true,
         changeOrigin: true,
+      },
+      "/udf": {
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/cn": {
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/hk": {
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/widgets.json": {
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/agents.json": {
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/apps.json": {
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/health": {
+        target: env.VITE_BACKEND_URL || "http://lenovo:8000",
+        changeOrigin: true,
+        secure: false,
       },
       ...(env.VITE_PROXY_PATH ? {
         [env.VITE_PROXY_PATH]: {

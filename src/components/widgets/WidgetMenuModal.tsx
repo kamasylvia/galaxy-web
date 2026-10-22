@@ -384,6 +384,9 @@ function WidgetMenuModal({
                                         <div className="flex gap-2.5 justify-between w-full items-center min-w-0">
                                           <p className="whitespace-nowrap capitalize truncate">
                                             {widget.name}
+                                            <span className="ml-2 text-xs text-ds-text-caption normal-case">
+                                              {widget.id}
+                                            </span>
                                           </p>
                                           <div className="flex items-center gap-2 ml-auto flex-shrink-0">
                                             <span className="text-xs text-ds-text-caption capitalize whitespace-nowrap block sm:hidden">

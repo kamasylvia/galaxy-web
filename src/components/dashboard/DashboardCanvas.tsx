@@ -15,6 +15,7 @@ import {
   type Dashboard as ApiDashboard,
   type Widget as ApiWidget,
 } from "../../services/dashboardApi";
+import { connectionService } from "../../services/connections/connectionService";
 import { setActiveDashboardId } from "../../services/dashboardSession";
 import { widgetService } from "../../services/widgets/widgetService";
 import type { WidgetConfig, WidgetParameterType, Group } from "../../types/widgets";
@@ -85,6 +86,12 @@ function findWidgetDefinition(
   definitions: WidgetConfig[],
   widgetData?: Record<string, unknown>,
 ): WidgetConfig | undefined {
+  // Stored full definition (saved with connectionUrl/connectionAuthentication) wins:
+  // bare registry definitions lack connection context and break data fetching.
+  if (widgetData && typeof widgetData.widgetId === 'string' && typeof widgetData.endpoint === 'string') {
+    return widgetData as unknown as WidgetConfig;
+  }
+
   const standardMatch = definitions.find(
     (def) =>
       def.id === widgetId ||
@@ -113,7 +120,15 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
   const [widgets, setWidgets] = useState<Widget[]>([]);
   const [layout, setLayout] = useState<LayoutItem[]>([]);
   const [dashboardTabs, setDashboardTabs] = useState<Array<{ id: string; name: string }>>([]);
+  // Whitelist of market prefixes allowed in this dashboard (dashboard.markets).
+  // Empty = unrestricted (mixed dashboards stay usable, menu shows all).
+  const [allowedMarkets, setAllowedMarkets] = useState<string[]>([]);
 
+  const marketOf = (idLike: unknown): string => {
+    const s = String(idLike || "");
+    const p = s.split("/")[0];
+    return !p || p === "built-in" || p.includes("-") ? "" : p;
+  };
   // Extract unique tabs from dashboard metadata and widget data
   const tabs = useMemo(() => {
     // Prefer dashboard-level tabs (created via manage_navigation_bar MCP tool)
@@ -270,7 +285,15 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
             const w = (dashboard.widgets || []).map(apiWidgetToWidget);
             setWidgets(w);
             setDashboardTabs(dashboard.tabs?.map(t => ({ id: t.id, name: t.name })) || []);
-            // Extract groups from dashboard metadata
+            // Whitelist: stored markets win; else infer from existing widgets.
+            if (Array.isArray(dashboard.markets) && dashboard.markets.length > 0) {
+              setAllowedMarkets(dashboard.markets);
+            } else {
+              const inferred = [...new Set(
+                w.map((x) => marketOf((x.data as Record<string, unknown> | undefined)?.widgetId || x.id)).filter(Boolean),
+              )];
+              setAllowedMarkets(inferred);
+            }
             if (dashboard.groups && Array.isArray(dashboard.groups)) {
               console.log('[Parameter Grouping] Dashboard loaded with groups:', {
                 dashboardId: activeId,
@@ -488,7 +511,42 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
 
       return newParams;
     });
-  }, [widgets, groupConfigs]);
+
+    // Persist ticker sync: rewrite data.params[].value (state + backend) so reload keeps it.
+    if (paramName === "ticker") {
+      setWidgets((prev) =>
+        prev.map((w) => {
+          const def = findWidgetDefinition(
+            (w.data as Record<string, unknown> | undefined)?.widgetId as string || w.id,
+            [...widgetDefinitions, ...customWidgets],
+            w.data as Record<string, unknown>,
+          );
+          const params = (def as unknown as { params?: Array<{ paramName?: string; name?: string }> } | undefined)?.params
+            || (w.data as Record<string, unknown> | undefined)?.params as Array<{ paramName?: string; name?: string }> | undefined;
+          if (!Array.isArray(params) || !params.some((p) => (p.paramName || p.name) === "ticker")) return w;
+          const data = { ...(w.data as Record<string, unknown> | undefined) };
+          const next = (Array.isArray(data.params) ? (data.params as Array<Record<string, unknown>>) : []).map((p) => ({ ...p }));
+          let touched = false;
+          for (const p of next) {
+            if (p.paramName === "ticker" || p.name === "ticker") {
+              if (p.value !== value) {
+                p.value = value as string;
+                touched = true;
+              }
+              if (p.default !== value) {
+                p.default = value as string;
+                touched = true;
+              }
+            }
+          }
+          if (!touched) return w;
+          data.params = next;
+          updateWidgetApi(activeId, w.id, { data }).catch(() => {});
+          return { ...w, data };
+        }),
+      );
+    }
+  }, [widgets, groupConfigs, widgetDefinitions, customWidgets, activeId]);
 
   async function saveLayout() {
     if (!activeId || widgets.length === 0) return;
@@ -568,13 +626,13 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
           const paramName = (param as unknown as { paramName?: string }).paramName || param.name;
           if (!paramName) return;
           
-          // 优先级：当前值 > param.default > param.value
+          // 优先级：当前值 > param.value(实例存值) > param.default
           if (params[paramName] !== undefined) {
             defaultParams[paramName] = params[paramName];
-          } else if (param.default !== undefined) {
-            defaultParams[paramName] = param.default;
           } else if ((param as unknown as { value?: unknown }).value !== undefined) {
             defaultParams[paramName] = (param as unknown as { value?: unknown }).value;
+          } else if (param.default !== undefined) {
+            defaultParams[paramName] = param.default;
           }
         });
         params = defaultParams;
@@ -767,8 +825,34 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
       capturedTab?.name ||
       tabs.find((t) => t.id === effectiveTabId)?.name;
 
+    // Active connection supplies connectionUrl/authentication for data fetching.
+    // widgetConfig from widgetService usually carries it; fall back to the
+    // currently connected connection so menu-added widgets fetch immediately.
+    let fallbackConn: { url?: string; authentication?: Array<{ key: string; value: string; location: "header" | "query" }> } | undefined;
+    try {
+      fallbackConn = connectionService.getConnections().find((c) => c.status === "connected" && c.url);
+    } catch {
+      fallbackConn = undefined;
+    }
+
     for (const widgetConfig of selectedWidgets) {
-      // Calculate a non-overlapping position on the active tab's grid.
+      // Whitelist: only allowed markets (or builtin) may be added.
+      const newMarket = marketOf(widgetConfig.id);
+      if (allowedMarkets.length > 0 && newMarket && !allowedMarkets.includes(newMarket)) {
+        setError(`"${widgetConfig.name}" 不在允许的市场(${allowedMarkets.join("/")})内，已拦截 (${newMarket})`);
+        continue;
+      }
+      // Skip duplicates: same widgetId already on this tab -> no-op.
+      const dup = widgets.some((w) => {
+        const wd = w.data as Record<string, unknown> | undefined;
+        const cfgId = (widgetConfig as unknown as Record<string, unknown>).widgetId as string | undefined;
+        return (wd?.widgetId === widgetConfig.id || (cfgId !== undefined && wd?.widgetId === cfgId)) &&
+          (wd?.tabId as string) === effectiveTabId;
+      });
+      if (dup) {
+        setError(`"${widgetConfig.name}" 已在当前页，跳过重复添加`);
+        continue;
+      }
       // Place new widgets below the lowest existing widget to avoid overlap.
       const tabLayout = layout.filter((item) => {
         const w = widgets.find((x) => x.id === item.i);
@@ -778,6 +862,11 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
         ? Math.max(...tabLayout.map((item) => item.y + item.h))
         : 0;
 
+      const connectionUrl = widgetConfig.connectionUrl || fallbackConn?.url || "";
+      const connectionAuthentication = widgetConfig.connectionAuthentication?.length
+        ? widgetConfig.connectionAuthentication
+        : (fallbackConn?.authentication || []);
+
       const newWidget: Widget = {
         id: `${widgetConfig.id}-${Date.now()}`,
         type: widgetConfig.type || "metric",
@@ -785,11 +874,14 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
         position: {
           x: 0,
           y: lowestY,
-          w: widgetConfig.gridData?.w || 2,
-          h: widgetConfig.gridData?.h || 2,
+          w: widgetConfig.gridData?.w || 20,
+          h: widgetConfig.gridData?.h || 8,
         },
         data: {
           ...widgetConfig,
+          widgetId: widgetConfig.id,
+          connectionUrl,
+          connectionAuthentication,
           ...(effectiveTabId
             ? { tabId: effectiveTabId, tabName: effectiveTabName || undefined }
             : {}),
@@ -814,6 +906,15 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
     }
     // Clear the captured tab context after use
     addWidgetTabRef.current = null;
+    if (allowedMarkets.length === 0) {
+      const inferred = [...new Set(
+        selectedWidgets.map((w) => marketOf(w.id)).filter(Boolean),
+      )];
+      if (inferred.length > 0) {
+        setAllowedMarkets(inferred);
+        updateDashboard(activeId, { markets: inferred }).catch(() => {});
+      }
+    }
   };
 
   const handleDeleteWidget = async (widgetId: string) => {
@@ -900,6 +1001,45 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
 
   return (
     <div className="dashboard-canvas flex flex-col h-full">
+      {(() => {
+        const tickerWidgets = widgets.filter((w) => {
+          const def = findWidgetDefinition(
+            (w.data as Record<string, unknown> | undefined)?.widgetId as string || w.id,
+            [...widgetDefinitions, ...customWidgets],
+            w.data as Record<string, unknown>,
+          );
+          const params = (def as unknown as { params?: Array<{ paramName?: string; name?: string }> } | undefined)?.params
+            || (w.data as Record<string, unknown> | undefined)?.params as Array<{ paramName?: string; name?: string }> | undefined;
+          return Array.isArray(params) && params.some((p) => (p.paramName || p.name) === "ticker");
+        });
+        if (tickerWidgets.length < 2) return null;
+        const vals = tickerWidgets.map((w) => {
+          const v = (widgetParameters[w.id]?.values as Record<string, unknown> | undefined)?.ticker;
+          return typeof v === "string" && v ? v : "";
+        });
+        const uniq = [...new Set(vals.filter(Boolean))];
+        const shown = uniq.length === 1 ? uniq[0] : "";
+        const mixedHint = vals.some((v) => !v) ? "部分未加载" : uniq.length > 1 ? `当前${uniq.length}个值未统一` : "";
+        return (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-dark-700 bg-gray-50 dark:bg-dark-900">
+            <span className="text-xs text-gray-500 dark:text-gray-400">全局标的 ({tickerWidgets.length})</span>
+            <input
+              key={shown + "|" + uniq.length}
+              className="w-32 px-2 py-1 text-sm border rounded bg-white dark:bg-dark-800 border-gray-300 dark:border-dark-600"
+              defaultValue={shown}
+              placeholder={uniq.length > 1 ? uniq.slice(0, 3).join(" / ") + "…" : "如 600325"}
+              title={mixedHint || shown}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                const v = (e.target as HTMLInputElement).value.trim();
+                if (!v) return;
+                tickerWidgets.forEach((w) => updateWidgetParameterWithGrouping(w.id, "ticker", v));
+              }}
+            />
+            <span className="text-xs text-gray-400">{mixedHint || "回车同步全盘"}</span>
+          </div>
+        );
+      })()}
       {tabs.length > 0 && (
         <NavigationBar
           tabs={tabs}
@@ -910,7 +1050,7 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
         />
       )}
       <div className="dashboard-grid-container flex-1" ref={containerRef}>
-        {filteredWidgets.length === 0 ? (
+      {filteredWidgets.length === 0 ? (
           <div className="dashboard-empty-state">
             <div className="dashboard-empty-grid">
               <div className="dashboard-empty-card">
@@ -1619,7 +1759,10 @@ export function DashboardCanvas({ dashboardId: propId, activeTab: propActiveTab,
         isOpen={isWidgetMenuOpen}
         onClose={() => setIsWidgetMenuOpen(false)}
         onAddWidgets={handleAddWidgetsFromMenu}
-        widgets={[...widgetDefinitions, ...customWidgets]}
+        widgets={[...widgetDefinitions, ...customWidgets].filter((d) => {
+          const m = marketOf(d.id);
+          return !m || allowedMarkets.length === 0 || allowedMarkets.includes(m);
+        })}
         loading={!widgetDefinitions.length && !customWidgets.length}
         currentTabName={addWidgetTabName}
       />

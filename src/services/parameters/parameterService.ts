@@ -43,7 +43,7 @@ function getAuthHeadersForUrl(baseUrl: string): HeadersInit {
 
 class ParameterService {
   private optionsCache: ParamOptionsCache = {};
-  private cacheDuration = 30000; // 30 seconds
+  private cacheDuration = 5 * 60 * 1000; // 5 minutes (tickers table rarely changes)
   private fetchPromises: Map<string, Promise<ParameterOption[]>> = new Map();
 
   /**

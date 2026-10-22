@@ -121,13 +121,13 @@ export function BaseWidget({
           const paramName = (param as unknown as { paramName?: string }).paramName || param.name;
           if (!paramName) return;
 
-          // 优先级：当前值 > param.default > param.value
+          // 优先级：当前值 > param.value(实例存值) > param.default
           if (currentValues[paramName] !== undefined) {
             initialValues[paramName] = currentValues[paramName];
-          } else if (param.default !== undefined) {
-            initialValues[paramName] = param.default;
           } else if ((param as unknown as { value?: unknown }).value !== undefined) {
             initialValues[paramName] = (param as unknown as { value?: unknown }).value;
+          } else if (param.default !== undefined) {
+            initialValues[paramName] = param.default;
           }
         });
 
