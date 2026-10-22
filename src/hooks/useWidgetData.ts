@@ -40,7 +40,8 @@ export function useWidgetData({
     enabled: !!endpoint && enabled,
     staleTime,
     gcTime: cacheTime,
-    retry,
+    retry: (count, err) => count < retry && !(err instanceof TypeError),
+    retryDelay: (count) => Math.min(1000 * 2 ** count, 8000),
     refetchOnWindowFocus: false,
     refetchOnMount: true,
   });

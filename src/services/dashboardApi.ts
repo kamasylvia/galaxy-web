@@ -46,6 +46,8 @@ export interface Dashboard {
   widgets: Widget[];
   created_at?: string;
   updated_at?: string;
+  /** Whitelist of market prefixes (cn/hk/...) allowed in this dashboard. */
+  markets?: string[];
   tabs?: Array<{ id: string; name: string; icon?: string }>;
   groups?: Array<{
     name: string;
@@ -61,6 +63,7 @@ export interface DashboardCreate {
   name: string;
   description?: string;
   widgets?: Widget[];
+  markets?: string[];
   tabs?: Array<{ id: string; name: string; icon?: string }>;
   groups?: Array<{
     name: string;
@@ -75,6 +78,7 @@ export interface DashboardUpdate {
   name?: string;
   description?: string;
   widgets?: Widget[];
+  markets?: string[];
   tabs?: Array<{ id: string; name: string; icon?: string }>;
   groups?: Array<{
     name: string;
