@@ -3,7 +3,7 @@ import { snapshotGenerator } from './snapshotGenerator';
 import { dashboardService } from './dashboardService';
 import { widgetCRUDService } from './widgetCRUDService';
 import { widgetService } from '../widgets/widgetService';
-import { connectionService } from '../connections/connectionService';
+import { connectionService, apiPath } from '../connections/connectionService';
 import { appsService } from './appsService';
 import { companionBridge } from './companionBridge';
 import { workspaceNavigationService } from './workspaceNavigationService';
@@ -1159,7 +1159,7 @@ export class CommandHandler {
           if (assignedAgentId) {
             const baseUrl = matchingConn.url.replace(/\/+$/, '');
             try {
-              const agentsUrl = `${baseUrl}/agents.json`;
+              const agentsUrl = `${baseUrl}${apiPath("/agents.json")}`;
               const response = await fetch(agentsUrl);
 
               if (!response.ok) {
@@ -1197,7 +1197,7 @@ export class CommandHandler {
             if (!conn.url) continue;
             try {
               const baseUrl = conn.url.replace(/\/+$/, '');
-              const agentsUrl = `${baseUrl}/agents.json`;
+              const agentsUrl = `${baseUrl}${apiPath("/agents.json")}`;
               const response = await fetch(agentsUrl);
               if (response.ok) {
                 const agentsData = await response.json();

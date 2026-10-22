@@ -3,22 +3,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { WidgetConfig } from "../../services/widgets/widgetService";
 
-interface WidgetMenuModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onAddWidgets: (widgets: WidgetConfig[]) => void;
-  widgets: WidgetConfig[];
-  loading?: boolean;
-  /** The name of the dashboard tab that new widgets will be added to. */
-  currentTabName?: string;
-}
-
 interface CategoryGroup {
   name: string;
   subcategories: { name: string; count: number }[];
   widgets: WidgetConfig[];
 }
 
+interface WidgetMenuModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onAddWidgets: (widgets: WidgetConfig[]) => void;
+  widgets: WidgetConfig[];
+  loading?: boolean;
+  currentTabName?: string;
+  /** Whitelist scope of this dashboard; empty = unrestricted. */
+  allowedMarkets?: string[];
+  /** All market prefixes available from connected backends; empty = hide selector. */
+  availableMarkets?: string[];
+  onMarketsChange?: (markets: string[]) => void;
+}
 function WidgetMenuModal({
   isOpen,
   onClose,
@@ -26,6 +29,9 @@ function WidgetMenuModal({
   widgets,
   loading = false,
   currentTabName,
+  allowedMarkets = [],
+  availableMarkets = [],
+  onMarketsChange,
 }: WidgetMenuModalProps) {
   const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -192,6 +198,29 @@ function WidgetMenuModal({
             <Icon name={"x" as never} size={20} />
           </Button>
         </div>
+
+        {availableMarkets.length > 0 && onMarketsChange && (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-dark-600">
+            <span className="text-xs text-gray-500 dark:text-gray-400">市场范围</span>
+            {availableMarkets.map((m) => {
+              const on = allowedMarkets.includes(m);
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    const next = on ? allowedMarkets.filter((x) => x !== m) : [...allowedMarkets, m];
+                    onMarketsChange(next);
+                  }}
+                  className={`px-2 py-0.5 text-xs rounded border ${on ? "bg-blue-600 text-white border-blue-600" : "text-gray-500 border-gray-300 dark:border-dark-600"}`}
+                >
+                  {m.toUpperCase()}
+                </button>
+              );
+            })}
+            <span className="text-xs text-gray-400">空=不限</span>
+          </div>
+        )}
 
         <div className="flex gap-2 mb-4 bg-gray-100 dark:bg-dark-800 rounded p-1">
           <button

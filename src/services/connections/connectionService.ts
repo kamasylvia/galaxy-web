@@ -5,6 +5,12 @@ export function normalizeBaseUrl(url: string): string {
   return url.endsWith('/') ? url.slice(0, -1) : url;
 }
 
+/** Backend serves discovery docs under /api (no bare routes). Idempotent. */
+export function apiPath(path: string): string {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return p === "/api" || p.startsWith("/api/") ? p : `/api${p}`;
+}
+
 function isValidHeaderName(name: string): boolean {
   return /^[a-zA-Z0-9\-_!#$%&'*+.`|^~]+$/.test(name);
 }
@@ -223,7 +229,7 @@ export const connectionService = {
     const validateWidgetsEnabled = details.validateWidgets !== false;
 
     if (validateWidgetsEnabled) {
-      const url = `${baseUrl}/widgets.json${params.toString() ? `?${params.toString()}` : ""}`;
+      const url = `${baseUrl}${apiPath("/widgets.json")}${params.toString() ? `?${params.toString()}` : ""}`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -299,10 +305,10 @@ export const connectionService = {
       }
     } else {
       const optionalEndpoints = [
-        { name: "widgets", path: "/widgets.json" },
-        { name: "agents", path: "/agents.json" },
-        { name: "apps", path: "/apps.json" },
-        { name: "prompts", path: "/prompts.json" },
+        { name: "widgets", path: apiPath("/widgets.json") },
+        { name: "agents", path: apiPath("/agents.json") },
+        { name: "apps", path: apiPath("/apps.json") },
+        { name: "prompts", path: apiPath("/prompts.json") },
       ];
 
       for (const endpoint of optionalEndpoints) {
@@ -373,10 +379,10 @@ export const connectionService = {
       };
 
       const endpoints = [
-        { name: "widgets", path: "/widgets.json" },
-        { name: "apps", path: "/apps.json" },
-        { name: "prompts", path: "/prompts.json" },
-        { name: "agents", path: "/agents.json" },
+        { name: "widgets", path: apiPath("/widgets.json") },
+        { name: "apps", path: apiPath("/apps.json") },
+        { name: "prompts", path: apiPath("/prompts.json") },
+        { name: "agents", path: apiPath("/agents.json") },
       ];
 
       let hasValidEndpoint = false;
