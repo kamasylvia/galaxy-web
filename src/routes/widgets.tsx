@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +6,7 @@ import AddDataModal from "../components/widgets/AddDataModal";
 import AddWidgetModal from "../components/widgets/AddWidgetModal";
 import {
   addWidget as addWidgetApi,
+  createDashboard,
   getDashboards,
   type Dashboard as ApiDashboard,
 } from "../services/dashboardApi";
@@ -34,6 +35,7 @@ function WidgetsPage() {
     new Set(),
   );
   const [hoveredWidgetId, setHoveredWidgetId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: widgets = [], isLoading, error } = useWidgets();
 
@@ -182,6 +184,12 @@ function WidgetsPage() {
       console.error("Failed to add widgets:", err);
       throw err;
     }
+  };
+
+  const handleCreateDashboard = async (name: string) => {
+    const dash = await createDashboard({ id: `dash-${Date.now()}`, name, widgets: [] });
+    await queryClient.invalidateQueries({ queryKey: ["dashboards"] });
+    return { id: dash.id, name: dash.name, description: dash.description || undefined };
   };
 
   const handleOpenAddDataModal = () => {
@@ -1031,6 +1039,7 @@ function WidgetsPage() {
         dashboards={dashboards}
         selectedWidgets={getSelectedWidgetObjects()}
         onAdd={handleAddWidgetsToDashboard}
+        onCreateDashboard={handleCreateDashboard}
         loading={isDashboardsLoading}
         error={dashboardsError ? dashboardsError.message : undefined}
       />

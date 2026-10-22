@@ -58,6 +58,11 @@ export default defineConfig(({ mode }) => {
       output: {
         manualChunks: (id: string) => {
           if (id.includes("node_modules")) {
+            // tiptap + prosemirror MUST stay in one chunk: circular imports
+            // break across chunks (Branch.empty / RopeSequence undefined).
+            if (id.includes("@tiptap") || id.includes("prosemirror")) {
+              return "editor";
+            }
             if (
               id.includes("react") &&
               !id.includes("react-router") &&
