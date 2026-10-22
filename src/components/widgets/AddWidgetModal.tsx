@@ -13,6 +13,7 @@ interface AddWidgetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (dashboardId: string, widgets: WidgetConfig[]) => Promise<void>;
+  onCreateDashboard: (name: string) => Promise<Dashboard>;
   selectedWidgets: WidgetConfig[];
   dashboards: Dashboard[];
   loading?: boolean;
@@ -23,6 +24,7 @@ function AddWidgetModal({
   isOpen,
   onClose,
   onAdd,
+  onCreateDashboard,
   selectedWidgets,
   dashboards,
   loading = false,
@@ -30,6 +32,9 @@ function AddWidgetModal({
 }: AddWidgetModalProps) {
   const { t } = useTranslation();
   const [selectedDashboard, setSelectedDashboard] = useState<string>("");
+  const [showNameInput, setShowNameInput] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newDashName, setNewDashName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [addSuccess, setAddSuccess] = useState<{
     success?: boolean;
@@ -76,8 +81,21 @@ function AddWidgetModal({
     }
   };
 
-  const handleCreateNewDashboard = () => {
-    console.log("Create new dashboard");
+  const handleCreateNewDashboard = async () => {
+    if (!showNameInput) {
+      setShowNameInput(true);
+      return;
+    }
+    const name = newDashName.trim() || t("widgetModal.newDashboardDefault", "New dashboard");
+    setIsCreating(true);
+    try {
+      const dash = await onCreateDashboard(name);
+      setSelectedDashboard(dash.id);
+      setShowNameInput(false);
+      setNewDashName("");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -143,14 +161,39 @@ function AddWidgetModal({
               )}
 
               {/* Create New Dashboard Button */}
-              <button
-                type="button"
-                className="w-full mb-4 py-2 px-3 rounded-sm border border-dashed border-light-300 dark:border-dark-500 text-sm text-light-600 dark:text-dark-400 hover:border-main-100 hover:text-main-100 dark:hover:border-main-100 dark:hover:text-main-100 transition-colors flex items-center justify-center gap-2"
-                onClick={handleCreateNewDashboard}
-              >
-                <Icon name={"plus" as never} size={16} />
-                {t("widgetModal.createNewDashboard")}
-              </button>
+              {showNameInput ? (
+                <div className="w-full mb-4 flex gap-2">
+                  <input
+                    type="text"
+                    value={newDashName}
+                    onChange={(e) => setNewDashName(e.target.value)}
+                    placeholder={t("widgetModal.newDashboardDefault", "New dashboard")}
+                    className="flex-1 py-2 px-3 rounded-sm border border-light-300 dark:border-dark-500 text-sm bg-input-field-bg"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateNewDashboard();
+                      if (e.key === "Escape") setShowNameInput(false);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-primary"
+                    onClick={handleCreateNewDashboard}
+                    disabled={isCreating}
+                  >
+                    {isCreating ? t("common.saving", "Saving...") : t("common.confirm", "OK")}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="w-full mb-4 py-2 px-3 rounded-sm border border-dashed border-light-300 dark:border-dark-500 text-sm text-light-600 dark:text-dark-400 hover:border-main-100 hover:text-main-100 dark:hover:border-main-100 dark:hover:text-main-100 transition-colors flex items-center justify-center gap-2"
+                  onClick={handleCreateNewDashboard}
+                >
+                  <Icon name={"plus" as never} size={16} />
+                  {t("widgetModal.createNewDashboard")}
+                </button>
+              )}
 
               {/* Dashboards Section */}
               <div className="space-y-2">

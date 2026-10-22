@@ -1,14 +1,31 @@
 import { getAuthHeaders, getAuthQueryParams, handleUnauthorized } from "./authService";
+import { connectionService } from "./connections/connectionService";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
+// Prefer the user's connected backend URL (runtime "connection" page)
+// over the build-time default, so LAN/Tailscale/remote entries all work.
+function resolveBaseUrl(): string {
+  try {
+    const conns = connectionService.getConnections();
+    const active = conns.find((c) => c.status === "connected" && c.url);
+    if (active) {
+      return active.url.endsWith("/") ? active.url.slice(0, -1) : active.url;
+    }
+  } catch {
+    // localStorage unavailable (SSR/tests) -> fall through to build default
+  }
+  return API_BASE_URL;
+}
+
 function buildUrl(path: string): string {
-  if (!API_BASE_URL) {
+  const base = resolveBaseUrl();
+  if (!base) {
     return path;
   }
 
-  const basePath = `${API_BASE_URL}${path}`;
-  const authParams = getAuthQueryParams(API_BASE_URL);
+  const basePath = `${base}${path}`;
+  const authParams = getAuthQueryParams(resolveBaseUrl());
   const queryString = authParams.toString();
 
   return queryString ? `${basePath}?${queryString}` : basePath;
@@ -94,14 +111,14 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 export async function getDashboards(): Promise<Dashboard[]> {
   const response = await fetch(buildUrl("/v1/dashboard"), {
-    headers: getAuthHeaders(API_BASE_URL),
+    headers: getAuthHeaders(resolveBaseUrl()),
   });
   return handleResponse<Dashboard[]>(response);
 }
 
 export async function getDashboard(id: string): Promise<Dashboard> {
   const response = await fetch(buildUrl(`/v1/dashboard/${id}`), {
-    headers: getAuthHeaders(API_BASE_URL),
+    headers: getAuthHeaders(resolveBaseUrl()),
   });
   return handleResponse<Dashboard>(response);
 }
@@ -109,7 +126,7 @@ export async function getDashboard(id: string): Promise<Dashboard> {
 export async function createDashboard(data: DashboardCreate): Promise<Dashboard> {
   const response = await fetch(buildUrl("/v1/dashboard"), {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeaders(API_BASE_URL) },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders(resolveBaseUrl()) },
     body: JSON.stringify(data),
   });
   return handleResponse<Dashboard>(response);
@@ -121,7 +138,7 @@ export async function updateDashboard(
 ): Promise<Dashboard> {
   const response = await fetch(buildUrl(`/v1/dashboard/${id}`), {
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...getAuthHeaders(API_BASE_URL) },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders(resolveBaseUrl()) },
     body: JSON.stringify(data),
   });
   return handleResponse<Dashboard>(response);
@@ -130,7 +147,7 @@ export async function updateDashboard(
 export async function deleteDashboard(id: string): Promise<void> {
   const response = await fetch(buildUrl(`/v1/dashboard/${id}`), {
     method: "DELETE",
-    headers: getAuthHeaders(API_BASE_URL),
+    headers: getAuthHeaders(resolveBaseUrl()),
   });
   return handleResponse<void>(response);
 }
@@ -141,7 +158,7 @@ export async function addWidget(
 ): Promise<Widget> {
   const response = await fetch(buildUrl(`/v1/dashboard/${dashboardId}/widgets`), {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeaders(API_BASE_URL) },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders(resolveBaseUrl()) },
     body: JSON.stringify(widget),
   });
   return handleResponse<Widget>(response);
@@ -156,7 +173,7 @@ export async function updateWidget(
     buildUrl(`/v1/dashboard/${dashboardId}/widgets/${encodeURIComponent(widgetId)}`),
     {
       method: "PUT",
-      headers: { "Content-Type": "application/json", ...getAuthHeaders(API_BASE_URL) },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders(resolveBaseUrl()) },
       body: JSON.stringify(data),
     },
   );
@@ -169,7 +186,7 @@ export async function deleteWidget(
 ): Promise<void> {
   const response = await fetch(
     buildUrl(`/v1/dashboard/${dashboardId}/widgets/${encodeURIComponent(widgetId)}`),
-    { method: "DELETE", headers: getAuthHeaders(API_BASE_URL) },
+    { method: "DELETE", headers: getAuthHeaders(resolveBaseUrl()) },
   );
   return handleResponse<void>(response);
 }
